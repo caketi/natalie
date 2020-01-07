@@ -1,6 +1,7 @@
 #include "natalie.h"
 #include <ctype.h>
 #include <stdarg.h>
+#include <gc.h>
 
 int is_constant_name(char *name) {
     return strlen(name) > 0 && isupper(name[0]);
@@ -33,7 +34,7 @@ NatObject *env_set(NatEnv *env, char *key, NatObject *val) {
 }
 
 NatEnv *build_env(NatEnv *outer) {
-    NatEnv *env = malloc(sizeof(NatEnv));
+    NatEnv *env = GC_MALLOC(sizeof(NatEnv));
     env->block = FALSE;
     env->outer = outer;
     env->jump_buf = NULL;
@@ -46,15 +47,15 @@ NatEnv *build_env(NatEnv *outer) {
         env->symbols = outer->symbols;
         env->next_object_id = outer->next_object_id;
     } else {
-        struct hashmap *global_table = malloc(sizeof(struct hashmap));
+        struct hashmap *global_table = GC_MALLOC(sizeof(struct hashmap));
         hashmap_init(global_table, hashmap_hash_string, hashmap_compare_string, 100);
         hashmap_set_key_alloc_funcs(global_table, hashmap_alloc_key_string, NULL);
         env->globals = global_table;
-        struct hashmap *symbol_table = malloc(sizeof(struct hashmap));
+        struct hashmap *symbol_table = GC_MALLOC(sizeof(struct hashmap));
         hashmap_init(symbol_table, hashmap_hash_string, hashmap_compare_string, 100);
         hashmap_set_key_alloc_funcs(symbol_table, hashmap_alloc_key_string, NULL);
         env->symbols = symbol_table;
-        env->next_object_id = malloc(sizeof(uint64_t));
+        env->next_object_id = GC_MALLOC_ATOMIC(sizeof(uint64_t));
         *env->next_object_id = 1;
     }
     hashmap_init(&env->data, hashmap_hash_string, hashmap_compare_string, 100);
@@ -178,13 +179,13 @@ int nat_truthy(NatObject *obj) {
 
 char *heap_string(char *str) {
     size_t len = strlen(str);
-    char *copy = malloc(len + 1);
+    char *copy = GC_MALLOC_ATOMIC(len + 1);
     memcpy(copy, str, len + 1);
     return copy;
 }
 
 NatObject *nat_alloc(NatEnv *env) {
-    NatObject *obj = malloc(sizeof(NatObject));
+    NatObject *obj = GC_MALLOC(sizeof(NatObject));
     obj->flags = 0;
     obj->type = NAT_VALUE_OTHER;
     obj->env = NULL;
@@ -226,9 +227,9 @@ NatObject *nat_module(NatEnv *env, char *name) {
 void nat_class_include(NatObject *class, NatObject *module) {
     class->included_modules_count++;
     if (class->included_modules_count == 1) {
-        class->included_modules = malloc(sizeof(NatObject*));
+        class->included_modules = GC_MALLOC(sizeof(NatObject*));
     } else {
-        class->included_modules = realloc(class->included_modules, sizeof(NatObject*) * class->included_modules_count);
+        class->included_modules = GC_REALLOC(class->included_modules, sizeof(NatObject*) * class->included_modules_count);
     }
     class->included_modules[class->included_modules_count - 1] = module;
 }
@@ -294,14 +295,14 @@ NatObject *nat_exception(NatEnv *env, NatObject *klass, char *message) {
 NatObject *nat_array(NatEnv *env) {
     NatObject *obj = nat_new(env, env_get(env, "Array"), 0, NULL, NULL, NULL);
     obj->type = NAT_VALUE_ARRAY;
-    obj->ary = calloc(NAT_ARRAY_INIT_SIZE, sizeof(NatObject*));
+    obj->ary = GC_MALLOC(NAT_ARRAY_INIT_SIZE * sizeof(NatObject*));
     obj->str_len = 0;
     obj->str_cap = NAT_ARRAY_INIT_SIZE;
     return obj;
 }
 
 void nat_grow_array(NatObject *obj, size_t capacity) {
-    obj->ary = realloc(obj->ary, sizeof(NatObject*) * capacity);
+    obj->ary = GC_REALLOC(obj->ary, sizeof(NatObject*) * capacity);
     obj->ary_cap = capacity;
 }
 
@@ -370,7 +371,7 @@ NatHashKeyListNode *nat_hash_key_list_append(NatObject *hash, NatObject *key, Na
     if (hash->key_list) {
         NatHashKeyListNode *first = hash->key_list;
         NatHashKeyListNode *last = hash->key_list->prev;
-        NatHashKeyListNode *new_last = malloc(sizeof(NatHashKeyListNode));
+        NatHashKeyListNode *new_last = GC_MALLOC(sizeof(NatHashKeyListNode));
         new_last->key = key;
         new_last->val = val;
         // <first> ... <last> <new_last> -|
@@ -382,7 +383,7 @@ NatHashKeyListNode *nat_hash_key_list_append(NatObject *hash, NatObject *key, Na
         last->next = new_last;
         return new_last;
     } else {
-        NatHashKeyListNode *node = malloc(sizeof(NatHashKeyListNode));
+        NatHashKeyListNode *node = GC_MALLOC(sizeof(NatHashKeyListNode));
         node->key = key;
         node->val = val;
         node->prev = node;
@@ -469,7 +470,7 @@ void nat_hash_put(NatEnv *env, NatObject *hash, NatObject *key, NatObject *val) 
         container->key_list_node->val = val;
         container->val = val;
     } else {
-        container = malloc(sizeof(NatHashValueContainer));
+        container = GC_MALLOC(sizeof(NatHashValueContainer));
         container->key_list_node = nat_hash_key_list_append(hash, key, val);
         container->val = val;
         hashmap_put(&hash->hashmap, key, container);
@@ -495,14 +496,14 @@ char* int_to_string(int64_t num) {
     if (num == 0) {
         return heap_string("0");
     } else {
-        str = malloc(INT_64_MAX_CHAR_LEN);
+        str = GC_MALLOC_ATOMIC(INT_64_MAX_CHAR_LEN);
         snprintf(str, INT_64_MAX_CHAR_LEN, "%" PRId64, num);
         return str;
     }
 }
 
 void nat_define_method(NatObject *obj, char *name, NatObject* (*fn)(NatEnv*, NatObject*, size_t, NatObject**, struct hashmap*, NatBlock *block)) {
-    NatMethod *method = malloc(sizeof(NatMethod));
+    NatMethod *method = GC_MALLOC(sizeof(NatMethod));
     method->fn = fn;
     method->env = NULL;
     if (nat_is_main_object(obj)) {
@@ -515,7 +516,7 @@ void nat_define_method(NatObject *obj, char *name, NatObject* (*fn)(NatEnv*, Nat
 }
 
 void nat_define_method_with_block(NatObject *obj, char *name, NatBlock *block) {
-    NatMethod *method = malloc(sizeof(NatMethod));
+    NatMethod *method = GC_MALLOC(sizeof(NatMethod));
     method->fn = block->fn;
     method->env = block->env;
     if (nat_is_main_object(obj)) {
@@ -528,7 +529,7 @@ void nat_define_method_with_block(NatObject *obj, char *name, NatBlock *block) {
 }
 
 void nat_define_singleton_method(NatEnv *env, NatObject *obj, char *name, NatObject* (*fn)(NatEnv*, NatObject*, size_t, NatObject**, struct hashmap*, NatBlock *block)) {
-    NatMethod *method = malloc(sizeof(NatMethod));
+    NatMethod *method = GC_MALLOC(sizeof(NatMethod));
     method->fn = fn;
     method->env = NULL;
     NatObject *klass = nat_singleton_class(env, obj);
@@ -735,7 +736,7 @@ int nat_respond_to(NatObject *obj, char *name) {
 }
 
 NatBlock *nat_block(NatEnv *env, NatObject *self, NatObject* (*fn)(NatEnv*, NatObject*, size_t, NatObject**, struct hashmap*, NatBlock*)) {
-    NatBlock *block = malloc(sizeof(NatBlock));
+    NatBlock *block = GC_MALLOC(sizeof(NatBlock));
     block->env = env;
     block->self = self;
     block->fn = fn;
@@ -764,7 +765,7 @@ NatObject *nat_lambda(NatEnv *env, NatBlock *block) {
 #define NAT_OBJECT_POINTER_LENGTH 2 + 16 + 1
 
 char *nat_object_pointer_id(NatObject *obj) {
-    char *ptr = malloc(NAT_OBJECT_POINTER_LENGTH);
+    char *ptr = GC_MALLOC_ATOMIC(NAT_OBJECT_POINTER_LENGTH);
     snprintf(ptr, NAT_OBJECT_POINTER_LENGTH, "%p", obj);
     return ptr;
 }
@@ -776,7 +777,7 @@ uint64_t nat_next_object_id(NatEnv *env) {
 void nat_grow_string(NatObject *obj, size_t capacity) {
     size_t len = strlen(obj->str);
     assert(capacity >= len);
-    obj->str = realloc(obj->str, capacity + 1);
+    obj->str = GC_REALLOC(obj->str, capacity + 1);
     obj->str_cap = capacity;
 }
 

@@ -2,6 +2,7 @@
 #define __NAT__
 
 #include <assert.h>
+#include <gc.h>
 #include <inttypes.h>
 #include <setjmp.h>
 #include <stddef.h>
@@ -15,7 +16,7 @@
 
 #define xDEBUG_METHOD_RESOLUTION
 
-#define NAT_RESCUE(env) setjmp(*(env->jump_buf = malloc(sizeof(jmp_buf))))
+#define NAT_RESCUE(env) setjmp(*(env->jump_buf = GC_MALLOC(sizeof(jmp_buf))))
 #define NAT_RAISE(env, klass, message_format, ...) nat_raise(env, klass, message_format, ##__VA_ARGS__); abort();
 #define NAT_ASSERT_ARGC1(expected) if(argc != expected) { NAT_RAISE(env, env_get(env, "ArgumentError"), "wrong number of arguments (given %d, expected %d)", argc, expected); }
 #define NAT_ASSERT_ARGC2(expected_low, expected_high) if(argc < expected_low || argc > expected_high) { NAT_RAISE(env, env_get(env, "ArgumentError"), "wrong number of arguments (given %d, expected %d..%d)", argc, expected_low, expected_high); }

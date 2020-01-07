@@ -95,7 +95,7 @@ module Natalie
       if compile_to_object_file
         "gcc -I #{SRC_PATH} -x c -c #{@c_path} -o #{out_path} 2>&1"
       else
-        "gcc -g -Wall #{shared ? '-fPIC -shared' : ''} -I #{SRC_PATH} -o #{out_path} #{OBJ_PATH}/*.o #{OBJ_PATH}/language/*.o -x c #{@c_path} 2>&1"
+        "gcc -g -Wall #{shared ? '-fPIC -shared' : ''} -lgc -I #{SRC_PATH} -o #{out_path} #{OBJ_PATH}/*.o #{OBJ_PATH}/language/*.o -x c #{@c_path} 2>&1"
       end
     end
 
