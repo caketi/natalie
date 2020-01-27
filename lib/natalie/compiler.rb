@@ -3,6 +3,7 @@ require 'sexp_processor'
 require_relative './compiler/pass1'
 require_relative './compiler/pass2'
 require_relative './compiler/pass3'
+require_relative './compiler/pass4'
 
 module Natalie
   class Compiler
@@ -10,17 +11,17 @@ module Natalie
     OBJ_PATH = File.expand_path('../../obj', __dir__)
     MAIN_TEMPLATE = File.read(File.join(SRC_PATH, 'main.c'))
     OBJ_TEMPLATE = <<-EOF
-      #{MAIN_TEMPLATE.scan(/^#include.*/).join("\n")}
+      #{MAIN_TEMPLATE.split(/\/\* end of front matter \*\//).first}
 
       /*TOP*/
 
       NatObject *obj_%{name}(NatEnv *env, NatObject *self) {
         /*BODY*/
-        return env_get(env, "nil");
+        return nil;
       }
     EOF
 
-    class RewriteError < StandardError; end
+    class CompileError < StandardError; end
 
     def initialize(ast, path)
       @ast = ast
@@ -62,27 +63,38 @@ module Natalie
       @c_path = temp_c.path
     end
 
+    def build_context
+      {
+        var_prefix: var_prefix,
+        var_num: 0,
+        built_in_constants: built_in_constants,
+        template: template
+      }
+    end
+
     def transform(ast)
-      p1 = Pass1.new
-      p1.var_prefix = var_prefix
-      r1 = p1.rewrite(ast)
-      p2 = Pass2.new
-      p2.var_prefix = var_prefix
-      p2.var_num = p1.var_num
-      result = p2.process(r1)
-      [
-        Pass3.new(p2.top).process,
-        Pass3.new(p2.decl + "\n" + result).process,
-      ]
+      context = build_context
+
+      ast = Pass1.new(context).go(ast)
+      if ENV['DEBUG_PASS1']
+        pp ast
+        exit
+      end
+
+      ast = Pass2.new(context).go(ast)
+      if ENV['DEBUG_PASS2']
+        pp ast
+        exit
+      end
+
+      ast = Pass3.new(context).go(ast)
+
+      Pass4.new(context, ast).go
     end
 
     def to_c
       @ast = expand_macros(@ast, @path)
-      (top, body) = transform(@ast)
-      out = template
-        .sub('/*TOP*/', top)
-        .sub('/*BODY*/', body)
-      reindent(out)
+      reindent(transform(@ast))
     end
 
     def load_path
@@ -90,6 +102,10 @@ module Natalie
     end
 
     private
+
+    def built_in_constants
+      template.match(/\/\/ built-in constants(.+?)\n\n/m)[1].scan(/[A-Z]\w+/)
+    end
 
     def compiler_command
       if compile_to_object_file

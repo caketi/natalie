@@ -16,19 +16,30 @@
 
 #define xDEBUG_METHOD_RESOLUTION
 
+#define NAT_TYPE(obj) (((int64_t)obj & 1) ? NAT_VALUE_INTEGER : obj->type)
+#define NAT_OBJ_CLASS(obj) (((int64_t)obj & 1) ? Integer : obj->klass)
 #define NAT_RESCUE(env) setjmp(*(env->jump_buf = GC_MALLOC(sizeof(jmp_buf))))
 #define NAT_RAISE(env, klass, message_format, ...) nat_raise(env, klass, message_format, ##__VA_ARGS__); abort();
-#define NAT_ASSERT_ARGC1(expected) if(argc != expected) { NAT_RAISE(env, env_get(env, "ArgumentError"), "wrong number of arguments (given %d, expected %d)", argc, expected); }
-#define NAT_ASSERT_ARGC2(expected_low, expected_high) if(argc < expected_low || argc > expected_high) { NAT_RAISE(env, env_get(env, "ArgumentError"), "wrong number of arguments (given %d, expected %d..%d)", argc, expected_low, expected_high); }
-#define NAT_ASSERT_ARGC_AT_LEAST(expected) if(argc < expected) { NAT_RAISE(env, env_get(env, "ArgumentError"), "wrong number of arguments (given %d, expected %d+)", argc, expected); }
+#define NAT_ASSERT_ARGC1(expected) if(argc != expected) { NAT_RAISE(env, nat_const_get(env, Object, "ArgumentError"), "wrong number of arguments (given %d, expected %d)", argc, expected); }
+#define NAT_ASSERT_ARGC2(expected_low, expected_high) if(argc < expected_low || argc > expected_high) { NAT_RAISE(env, nat_const_get(env, Object, "ArgumentError"), "wrong number of arguments (given %d, expected %d..%d)", argc, expected_low, expected_high); }
+#define NAT_ASSERT_ARGC_AT_LEAST(expected) if(argc < expected) { NAT_RAISE(env, nat_const_get(env, Object, "ArgumentError"), "wrong number of arguments (given %d, expected %d+)", argc, expected); }
 #define GET_MACRO(_1, _2, NAME, ...) NAME
 #define NAT_ASSERT_ARGC(...) GET_MACRO(__VA_ARGS__, NAT_ASSERT_ARGC2, NAT_ASSERT_ARGC1)(__VA_ARGS__)
 #define NAT_UNREACHABLE() fprintf(stderr, "panic: unreachable\n"); abort();
+#define NAT_MIN(a, b) ((a < b) ? a : b)
+#define NAT_MAX(a, b) ((a > b) ? a : b)
 
 #define TRUE 1
 #define FALSE 0
 
+// only 63-bit numbers for now
+#define NAT_MIN_INT INT64_MIN >> 1
+#define NAT_MAX_INT INT64_MAX >> 1
+
+#define NAT_INT_VALUE(obj) (((int64_t)obj & 1) ? ((int64_t)obj) >> 1 : obj->integer)
+
 typedef struct NatObject NatObject;
+typedef struct NatGlobalEnv NatGlobalEnv;
 typedef struct NatEnv NatEnv;
 typedef struct NatBlock NatBlock;
 typedef struct NatMethod NatMethod;
@@ -36,11 +47,16 @@ typedef struct NatHashKeyListNode NatHashKeyListNode;
 typedef struct NatHashKeyListNode NatHashIter;
 typedef struct NatHashValueContainer NatHashValueContainer;
 
-struct NatEnv {
-    struct hashmap data;
+struct NatGlobalEnv {
     struct hashmap *globals;
     struct hashmap *symbols;
     uint64_t *next_object_id;
+};
+
+struct NatEnv {
+    NatGlobalEnv *global_env;
+    size_t var_count;
+    NatObject **vars;
     NatEnv *outer;
     int block;
     jmp_buf *jump_buf;
@@ -97,7 +113,7 @@ enum NatValueType {
 
 struct NatObject {
     enum NatValueType type;
-    NatObject *class;
+    NatObject *klass;
     NatObject *singleton_class;
     int flags;
 
@@ -105,6 +121,7 @@ struct NatObject {
 
     int64_t id;
 
+    struct hashmap constants;
     struct hashmap ivars;
     
     union {
@@ -162,23 +179,36 @@ struct NatObject {
     };
 };
 
-int is_constant_name(char *name);
-int is_special_name(char *name);
+NatObject *Object,
+          *Integer,
+          *nil,
+          *true_obj,
+          *false_obj;
 
-NatObject *env_get(NatEnv *env, char *key);
-NatObject *env_set(NatEnv *env, char *key, NatObject *val);
-NatEnv *build_env(NatEnv *outer);
-NatEnv *build_block_env(NatEnv *outer, NatEnv *calling_env);
+int nat_is_constant_name(char *name);
+int nat_is_special_name(char *name);
+
+NatObject *nat_const_get(NatEnv *env, NatObject *klass, char *name);
+NatObject *nat_const_get_or_null(NatEnv *env, NatObject *klass, char *name);
+NatObject *nat_const_set(NatEnv *env, NatObject *klass, char *name, NatObject *val);
+
+NatObject *nat_var_get2(NatEnv *env, char *key, size_t index);
+NatObject *nat_var_set2(NatEnv *env, char *key, size_t index, NatObject *val);
+NatEnv *nat_build_env(NatEnv *outer);
+NatEnv *nat_build_block_env(NatEnv *outer, NatEnv *calling_env);
+
+char *nat_find_current_method_name(NatEnv *env);
+char *nat_find_method_name(NatEnv *env);
 
 NatObject* nat_raise(NatEnv *env, NatObject *klass, char *message_format, ...);
 NatObject* nat_raise_exception(NatEnv *env, NatObject *exception);
 int nat_rescue(NatEnv *env);
 
-NatObject *ivar_get(NatEnv *env, NatObject *obj, char *name);
-NatObject *ivar_set(NatEnv *env, NatObject *obj, char *name, NatObject *val);
+NatObject *nat_ivar_get(NatEnv *env, NatObject *obj, char *name);
+NatObject *nat_ivar_set(NatEnv *env, NatObject *obj, char *name, NatObject *val);
 
-NatObject *global_get(NatEnv *env, char *name);
-NatObject *global_set(NatEnv *env, char *name, NatObject *val);
+NatObject *nat_global_get(NatEnv *env, char *name);
+NatObject *nat_global_set(NatEnv *env, char *name, NatObject *val);
 
 int nat_truthy(NatObject *obj);
 
@@ -187,8 +217,8 @@ char *heap_string(char *str);
 NatObject *nat_alloc(NatEnv *env);
 NatObject *nat_subclass(NatEnv *env, NatObject *superclass, char *name);
 NatObject *nat_module(NatEnv *env, char *name);
-void nat_class_include(NatObject *class, NatObject *module);
-NatObject *nat_new(NatEnv *env, NatObject *class, size_t argc, NatObject **args, struct hashmap *kwargs, NatBlock *block);
+void nat_class_include(NatObject *klass, NatObject *module);
+NatObject *nat_new(NatEnv *env, NatObject *klass, size_t argc, NatObject **args, struct hashmap *kwargs, NatBlock *block);
 
 NatObject *nat_singleton_class(NatEnv *env, NatObject *obj);
 
@@ -210,12 +240,10 @@ char *nat_defined(NatEnv *env, NatObject *receiver, char *name);
 NatObject *nat_defined_obj(NatEnv *env, NatObject *receiver, char *name);
 
 NatObject *nat_send(NatEnv *env, NatObject *receiver, char *sym, size_t argc, NatObject **args, NatBlock *block);
-NatObject *nat_lookup_or_send(NatEnv *env, NatObject *receiver, char *sym, size_t argc, NatObject **args, NatBlock *block);
-NatObject *nat_lookup(NatEnv *env, char *name);
 void nat_methods(NatEnv *env, NatObject *array, NatObject *klass);
-NatMethod *nat_find_method(NatObject *class, char *method_name, NatObject **matching_class_or_module);
-NatObject *nat_call_method_on_class(NatEnv *env, NatObject *class, NatObject *instance_class, char *method_name, NatObject *self, size_t argc, NatObject **args, struct hashmap *kwargs, NatBlock *block);
-int nat_respond_to(NatObject *obj, char *name);
+NatMethod *nat_find_method(NatObject *klass, char *method_name, NatObject **matching_class_or_module);
+NatObject *nat_call_method_on_class(NatEnv *env, NatObject *klass, NatObject *instance_class, char *method_name, NatObject *self, size_t argc, NatObject **args, struct hashmap *kwargs, NatBlock *block);
+int nat_respond_to(NatEnv *env, NatObject *obj, char *name);
 
 NatBlock *nat_block(NatEnv *env, NatObject *self, NatObject* (*fn)(NatEnv*, NatObject*, size_t, NatObject**, struct hashmap*, NatBlock*));
 NatObject *nat_run_block(NatEnv *env, NatBlock *the_block, size_t argc, NatObject **args, struct hashmap *kwargs, NatBlock *block);
@@ -244,6 +272,8 @@ NatObject *nat_array(NatEnv *env);
 void nat_grow_array(NatObject *obj, size_t capacity);
 void nat_grow_array_at_least(NatObject *obj, size_t min_capacity);
 void nat_array_push(NatObject *array, NatObject *obj);
+void nat_assign_arg(NatEnv *env, char *name, int argc, NatObject **args, int index, NatObject* default_value);
+void nat_assign_rest_arg(NatEnv *env, char *name, size_t argc, NatObject **args, size_t index, size_t count);
 void nat_array_push_splat(NatEnv *env, NatObject *array, NatObject *obj);
 void nat_array_expand_with_nil(NatEnv *env, NatObject *array, size_t size);
 
@@ -265,7 +295,7 @@ NatObject *nat_not(NatEnv *env, NatObject *val);
 void nat_alias(NatEnv *env, NatObject *self, char *new_name, char *old_name);
 
 void nat_run_at_exit_handlers(NatEnv *env);
-
 void nat_print_exception_with_backtrace(NatEnv *env, NatObject *exception);
+void nat_handle_top_level_exception(NatEnv *env, int run_exit_handlers);
 
 #endif
