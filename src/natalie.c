@@ -76,22 +76,23 @@ NatGlobalEnv *nat_build_global_env() {
     global_env->symbols = symbol_table;
     global_env->next_object_id = malloc(sizeof(uint64_t));
     *global_env->next_object_id = 1;
+    global_env->env_pool_count = 0;
     return global_env;
 }
 
 NatEnv *nat_build_env(NatEnv *outer) {
-    NatEnv *env = malloc(sizeof(NatEnv));
-    env->var_count = 0;
-    env->vars = NULL;
-    env->block = FALSE;
-    env->outer = outer;
-    env->jump_buf = NULL;
-    env->caller = NULL;
-    env->line = 0;
-    env->method_name = NULL;
+    NatEnv *env;
     if (outer) {
-        env->global_env = outer->global_env;
+        NatGlobalEnv *global_env = outer->global_env;
+        if (global_env->env_pool_count == 0) {
+            global_env->env_pool_count = NAT_ENV_POOL_SIZE;
+            global_env->env_pool = calloc(NAT_ENV_POOL_SIZE, sizeof(NatEnv));
+        }
+        env = &global_env->env_pool[--global_env->env_pool_count];
+        env->outer = outer;
+        env->global_env = global_env;
     } else {
+        env = calloc(1, sizeof(NatEnv));
         env->global_env = nat_build_global_env();
     }
     return env;

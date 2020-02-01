@@ -37,6 +37,8 @@
 
 #define NAT_INT_VALUE(obj) (((int64_t)obj & 1) ? ((int64_t)obj) >> 1 : obj->integer)
 
+#define NAT_ENV_POOL_SIZE 100
+
 typedef struct NatObject NatObject;
 typedef struct NatGlobalEnv NatGlobalEnv;
 typedef struct NatEnv NatEnv;
@@ -45,12 +47,6 @@ typedef struct NatMethod NatMethod;
 typedef struct NatHashKeyListNode NatHashKeyListNode;
 typedef struct NatHashKeyListNode NatHashIter;
 typedef struct NatHashValueContainer NatHashValueContainer;
-
-struct NatGlobalEnv {
-    struct hashmap *globals;
-    struct hashmap *symbols;
-    uint64_t *next_object_id;
-};
 
 struct NatEnv {
     NatGlobalEnv *global_env;
@@ -64,6 +60,14 @@ struct NatEnv {
     char *file;
     size_t line;
     char *method_name;
+};
+
+struct NatGlobalEnv {
+    struct hashmap *globals;
+    struct hashmap *symbols;
+    uint64_t *next_object_id;
+    size_t env_pool_count;
+    NatEnv *env_pool;
 };
 
 struct NatBlock {
