@@ -77,7 +77,7 @@ module Natalie
           "&#{p args.first}:1"
         else
           args_name = temp('args')
-          decl "NatObject **#{args_name} = calloc(#{args.size}, sizeof(NatObject));"
+          decl "NatObject **#{args_name} = gc_calloc(&gc, #{args.size}, sizeof(NatObject));"
           args.each_with_index do |arg, i|
             decl "#{args_name}[#{i}] = #{p arg};"
           end
@@ -469,7 +469,7 @@ module Natalie
       def process_var_alloc(exp)
         count = exp.last
         if count > 0
-          decl "env->vars = calloc(#{count}, sizeof(NatObject*));"
+          decl "env->vars = gc_calloc(&gc, #{count}, sizeof(NatObject*));"
         end
         ''
       end

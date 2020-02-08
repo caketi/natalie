@@ -18,6 +18,7 @@
 #include "nat_string.h"
 #include "nat_symbol.h"
 #include "nat_true_class.h"
+#include "gc.h"
 
 // built-in constants
 NatObject *Object,
@@ -265,8 +266,9 @@ NatObject *EVAL(NatEnv *env) {
     }
 }
 
-int main(void) {
+int main(int argc, char* argv[]) {
     setvbuf(stdout, NULL, _IOLBF, 1024);
+    gc_start(&gc, &argc);
     NatEnv *env = build_top_env();
     if (EVAL(env)) {
         return 0;

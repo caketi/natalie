@@ -13,6 +13,7 @@
 #include <errno.h>
 
 #include "hashmap.h"
+#include "gc.h"
 
 #ifndef HASHMAP_NOASSERT
 #include <assert.h>
@@ -194,7 +195,7 @@ static int hashmap_rehash(struct hashmap *map, size_t new_size)
     HASHMAP_ASSERT(new_size >= HASHMAP_SIZE_MIN);
     HASHMAP_ASSERT((new_size & (new_size - 1)) == 0);
 
-    new_table = (struct hashmap_entry *)calloc(new_size,
+    new_table = (struct hashmap_entry *)gc_calloc(&gc, new_size,
         sizeof(struct hashmap_entry));
     if (!new_table) {
         return -ENOMEM;
@@ -280,7 +281,7 @@ int hashmap_init(struct hashmap *map, unsigned long (*hash_func)(const void *),
     map->table_size_init = initial_size;
     map->table_size = initial_size;
     map->num_entries = 0;
-    map->table = (struct hashmap_entry *)calloc(initial_size,
+    map->table = (struct hashmap_entry *)gc_calloc(&gc, initial_size,
         sizeof(struct hashmap_entry));
     if (!map->table) {
         return -ENOMEM;
@@ -436,7 +437,7 @@ void hashmap_reset(struct hashmap *map)
     if (map->table_size == map->table_size_init) {
         return;
     }
-    new_table = (struct hashmap_entry *)realloc(map->table,
+    new_table = (struct hashmap_entry *)gc_realloc(&gc, map->table,
         sizeof(struct hashmap_entry) * map->table_size_init);
     if (!new_table) {
         return;
