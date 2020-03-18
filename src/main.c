@@ -1,44 +1,22 @@
 #include <setjmp.h>
 
 #include "natalie.h"
-#include "nat_array.h"
-#include "nat_basic_object.h"
-#include "nat_class.h"
-#include "nat_comparable.h"
-#include "nat_exception.h"
-#include "nat_false_class.h"
-#include "nat_hash.h"
-#include "nat_integer.h"
-#include "nat_kernel.h"
-#include "nat_main_obj.h"
-#include "nat_module.h"
-#include "nat_nil_class.h"
-#include "nat_object.h"
-#include "nat_proc.h"
-#include "nat_string.h"
-#include "nat_symbol.h"
-#include "nat_true_class.h"
-
-// built-in constants
-NatObject *Object,
-          *Integer,
-          *nil,
-          *true_obj,
-          *false_obj;
+#include "builtin.h"
 
 /* end of front matter */
 
-NatObject *obj_language_exceptions(NatEnv *env, NatObject *self);
+/*OBJ_NAT*/
 
 NatEnv *build_top_env() {
-    NatEnv *env = nat_build_env(NULL);
+    NatEnv *env = GC_MALLOC(sizeof(NatEnv));
+    nat_build_env(env, NULL);
     env->method_name = heap_string("<main>");
 
     NatObject *Class = nat_alloc(env);
     Class->type = NAT_VALUE_CLASS;
     Class->class_name = heap_string("Class");
     Class->klass = Class;
-    Class->env = nat_build_env(env);
+    nat_build_env(&Class->env, env);
     hashmap_init(&Class->methods, hashmap_hash_string, hashmap_compare_string, 100);
     hashmap_set_key_alloc_funcs(&Class->methods, hashmap_alloc_key_string, NULL);
     hashmap_init(&Class->constants, hashmap_hash_string, hashmap_compare_string, 10);
@@ -49,8 +27,9 @@ NatEnv *build_top_env() {
     BasicObject->type = NAT_VALUE_CLASS;
     BasicObject->class_name = heap_string("BasicObject");
     BasicObject->klass = Class;
-    BasicObject->env = nat_build_env(env);
+    nat_build_env(&BasicObject->env, env);
     BasicObject->superclass = NULL;
+    BasicObject->cvars.table = NULL;
     hashmap_init(&BasicObject->methods, hashmap_hash_string, hashmap_compare_string, 100);
     hashmap_set_key_alloc_funcs(&BasicObject->methods, hashmap_alloc_key_string, NULL);
     hashmap_init(&BasicObject->constants, hashmap_hash_string, hashmap_compare_string, 10);
@@ -62,7 +41,7 @@ NatEnv *build_top_env() {
     nat_define_method(BasicObject, "equal?", Kernel_equal);
     nat_define_method(BasicObject, "instance_eval", BasicObject_instance_eval);
 
-    Object = nat_subclass(env, BasicObject, "Object");
+    NatObject *Object = NAT_OBJECT = nat_subclass(env, BasicObject, "Object");
     nat_define_singleton_method(env, Object, "new", Object_new);
 
     // these must be defined after Object exists
@@ -113,7 +92,10 @@ NatEnv *build_top_env() {
     nat_define_method(Kernel, "is_a?", Kernel_is_a);
     nat_define_method(Kernel, "hash", Kernel_hash);
     nat_define_method(Kernel, "proc", Kernel_proc);
+    nat_define_method(Kernel, "lambda", Kernel_lambda);
     nat_define_method(Kernel, "__method__", Kernel_method);
+    nat_define_method(Kernel, "freeze", Kernel_freeze);
+    nat_define_method(Kernel, "nil?", Kernel_is_nil);
 
     NatObject *Comparable = nat_module(env, "Comparable");
     nat_const_set(env, Object, "Comparable", Comparable);
@@ -126,37 +108,38 @@ NatEnv *build_top_env() {
 
     NatObject *NilClass = nat_subclass(env, Object, "NilClass");
     nat_const_set(env, Object, "NilClass", NilClass);
-    nat_define_singleton_method(env, NilClass, "new", NilClass_new);
+    nat_undefine_singleton_method(env, NilClass, "new");
     nat_define_method(NilClass, "to_s", NilClass_to_s);
     nat_define_method(NilClass, "to_a", NilClass_to_a);
     nat_define_method(NilClass, "inspect", NilClass_inspect);
+    nat_define_method(NilClass, "nil?", NilClass_is_nil);
 
-    nil = nat_new(env, NilClass, 0, NULL, NULL, NULL);
+    NatObject *nil = NAT_NIL = nat_new(env, NilClass, 0, NULL, NULL, NULL);
     nil->type = NAT_VALUE_NIL;
 
     NatObject *TrueClass = nat_subclass(env, Object, "TrueClass");
     nat_const_set(env, Object, "TrueClass", TrueClass);
-    nat_define_singleton_method(env, TrueClass, "new", TrueClass_new);
+    nat_undefine_singleton_method(env, TrueClass, "new");
     nat_define_method(TrueClass, "to_s", TrueClass_to_s);
     nat_define_method(TrueClass, "inspect", TrueClass_to_s);
 
-    true_obj = nat_new(env, TrueClass, 0, NULL, NULL, NULL);
+    NatObject *true_obj = NAT_TRUE = nat_new(env, TrueClass, 0, NULL, NULL, NULL);
     true_obj->type = NAT_VALUE_TRUE;
 
     NatObject *FalseClass = nat_subclass(env, Object, "FalseClass");
     nat_const_set(env, Object, "FalseClass", FalseClass);
-    nat_define_singleton_method(env, FalseClass, "new", FalseClass_new);
+    nat_undefine_singleton_method(env, FalseClass, "new");
     nat_define_method(FalseClass, "to_s", FalseClass_to_s);
     nat_define_method(FalseClass, "inspect", FalseClass_to_s);
 
-    false_obj = nat_new(env, FalseClass, 0, NULL, NULL, NULL);
+    NatObject *false_obj = NAT_FALSE = nat_new(env, FalseClass, 0, NULL, NULL, NULL);
     false_obj->type = NAT_VALUE_FALSE;
 
     NatObject *Numeric = nat_subclass(env, Object, "Numeric");
     nat_const_set(env, Object, "Numeric", Numeric);
     nat_class_include(Numeric, Comparable);
 
-    Integer = nat_subclass(env, Numeric, "Integer");
+    NatObject *Integer = NAT_INTEGER = nat_subclass(env, Numeric, "Integer");
     nat_const_set(env, Object, "Integer", Integer);
     nat_define_method(Integer, "to_s", Integer_to_s);
     nat_define_method(Integer, "inspect", Integer_to_s);
@@ -167,9 +150,13 @@ NatEnv *build_top_env() {
     nat_define_method(Integer, "<=>", Integer_cmp);
     nat_define_method(Integer, "===", Integer_eqeqeq);
     nat_define_method(Integer, "times", Integer_times);
+    nat_define_method(Integer, "&", Integer_bitwise_and);
+    nat_define_method(Integer, "|", Integer_bitwise_or);
+    nat_define_method(Integer, "succ", Integer_succ);
 
     NatObject *String = nat_subclass(env, Object, "String");
     nat_const_set(env, Object, "String", String);
+    nat_define_singleton_method(env, String, "new", String_new);
     nat_class_include(String, Comparable);
     nat_define_method(String, "to_s", String_to_s);
     nat_define_method(String, "inspect", String_inspect);
@@ -179,10 +166,14 @@ NatEnv *build_top_env() {
     nat_define_method(String, "*", String_mul);
     nat_define_method(String, "==", String_eqeq);
     nat_define_method(String, "===", String_eqeq);
+    nat_define_method(String, "=~", String_eqtilde);
+    nat_define_method(String, "match", String_match);
+    nat_define_method(String, "succ", String_succ);
 
     NatObject *Array = nat_subclass(env, Object, "Array");
     nat_const_set(env, Object, "Array", Array);
     nat_define_method(Array, "inspect", Array_inspect);
+    nat_define_method(Array, "to_s", Array_inspect);
     nat_define_method(Array, "<<", Array_ltlt);
     nat_define_method(Array, "+", Array_add);
     nat_define_method(Array, "-", Array_sub);
@@ -200,6 +191,7 @@ NatEnv *build_top_env() {
     nat_define_method(Array, "to_ary", Array_to_ary);
     nat_define_method(Array, "pop", Array_pop);
     nat_define_method(Array, "include?", Array_include);
+    nat_define_method(Array, "sort", Array_sort);
 
     NatObject *Hash = nat_subclass(env, Object, "Hash");
     nat_const_set(env, Object, "Hash", Hash);
@@ -214,10 +206,61 @@ NatEnv *build_top_env() {
     nat_define_method(Hash, "keys", Hash_keys);
     nat_define_method(Hash, "values", Hash_values);
 
+    NatObject *Regexp = nat_subclass(env, Object, "Regexp");
+    nat_const_set(env, Object, "Regexp", Regexp);
+    nat_define_singleton_method(env, Regexp, "new", Regexp_new);
+    nat_define_method(Regexp, "==", Regexp_eqeq);
+    nat_define_method(Regexp, "===", Regexp_match);
+    nat_define_method(Regexp, "inspect", Regexp_inspect);
+    nat_define_method(Regexp, "=~", Regexp_eqtilde);
+    nat_define_method(Regexp, "match", Regexp_match);
+
+    NatObject *Range = nat_subclass(env, Object, "Range");
+    nat_const_set(env, Object, "Range", Range);
+    nat_define_singleton_method(env, Range, "new", Range_new);
+    nat_define_method(Range, "begin", Range_begin);
+    nat_define_method(Range, "first", Range_begin);
+    nat_define_method(Range, "end", Range_end);
+    nat_define_method(Range, "last", Range_end);
+    nat_define_method(Range, "exclude_end?", Range_exclude_end);
+    nat_define_method(Range, "to_a", Range_to_a);
+    nat_define_method(Range, "each", Range_each);
+    nat_define_method(Range, "inspect", Range_inspect);
+
+    NatObject *Thread = nat_subclass(env, Object, "Thread");
+    nat_const_set(env, Object, "Thread", Thread);
+    nat_define_singleton_method(env, Thread, "new", Thread_new);
+    nat_define_method(Thread, "join", Thread_join);
+    nat_define_method(Thread, "value", Thread_value);
+
+    NatObject *MatchData = nat_subclass(env, Object, "MatchData");
+    nat_const_set(env, Object, "MatchData", MatchData);
+    nat_define_method(MatchData, "size", MatchData_size);
+    nat_define_method(MatchData, "length", MatchData_size);
+    nat_define_method(MatchData, "to_s", MatchData_to_s);
+    nat_define_method(MatchData, "[]", MatchData_ref);
+
     NatObject *Proc = nat_subclass(env, Object, "Proc");
     nat_const_set(env, Object, "Proc", Proc);
+    nat_define_singleton_method(env, Proc, "new", Proc_new);
     nat_define_method(Proc, "call", Proc_call);
     nat_define_method(Proc, "lambda?", Proc_lambda);
+
+    NatObject *IO = nat_subclass(env, Object, "IO");
+    nat_const_set(env, Object, "IO", IO);
+    nat_define_singleton_method(env, IO, "new", IO_new);
+    nat_define_method(IO, "initialize", IO_initialize);
+    nat_define_method(IO, "fileno", IO_fileno);
+    nat_define_method(IO, "read", IO_read);
+    nat_define_method(IO, "write", IO_write);
+    nat_define_method(IO, "puts", IO_puts);
+    nat_define_method(IO, "print", IO_print);
+    nat_define_method(IO, "close", IO_close);
+    nat_define_method(IO, "seek", IO_seek);
+    NatObject *File = nat_subclass(env, IO, "File");
+    nat_const_set(env, Object, "File", File);
+    nat_define_method(File, "initialize", File_initialize);
+    FILE_INIT();
 
     NatObject *Exception = nat_subclass(env, Object, "Exception");
     nat_const_set(env, Object, "Exception", Exception);
@@ -226,6 +269,10 @@ NatEnv *build_top_env() {
     nat_define_method(Exception, "message", Exception_message);
     nat_define_method(Exception, "backtrace", Exception_backtrace);
     nat_define_singleton_method(env, Exception, "new", Exception_new);
+    NatObject *ScriptError = nat_subclass(env, Exception, "ScriptError");
+    nat_const_set(env, Object, "ScriptError", ScriptError);
+    NatObject *SyntaxError = nat_subclass(env, ScriptError, "SyntaxError");
+    nat_const_set(env, Object, "SyntaxError", SyntaxError);
     NatObject *StandardError = nat_subclass(env, Exception, "StandardError");
     nat_const_set(env, Object, "StandardError", StandardError);
     NatObject *NameError = nat_subclass(env, StandardError, "NameError");
@@ -240,8 +287,36 @@ NatEnv *build_top_env() {
     nat_const_set(env, Object, "TypeError", TypeError);
     NatObject *SystemExit = nat_subclass(env, StandardError, "SystemExit");
     nat_const_set(env, Object, "SystemExit", SystemExit);
+    NatObject *ZeroDivisionError = nat_subclass(env, StandardError, "ZeroDivisionError");
+    nat_const_set(env, Object, "ZeroDivisionError", ZeroDivisionError);
+    NatObject *ThreadError = nat_subclass(env, StandardError, "ThreadError");
+    nat_const_set(env, Object, "ThreadError", ThreadError);
+    NatObject *FrozenError = nat_subclass(env, RuntimeError, "FrozenError");
+    nat_const_set(env, Object, "FrozenError", FrozenError);
 
     nat_global_set(env, "$NAT_at_exit_handlers", nat_array(env));
+
+    NatObject *self = nat_new(env, NAT_OBJECT, 0, NULL, NULL, NULL);
+    self->flags = NAT_FLAG_MAIN_OBJECT;
+    nat_define_singleton_method(env, self, "inspect", main_obj_inspect);
+    nat_global_set(env, "$NAT_main_object", self);
+
+    NatObject *stdin_fileno = nat_integer(env, STDIN_FILENO);
+    NatObject *nat_stdin = nat_new(env, IO, 1, &stdin_fileno, NULL, NULL);
+    nat_global_set(env, "$stdin", nat_stdin);
+    nat_const_set(env, Object, "STDIN", nat_stdin);
+
+    NatObject *stdout_fileno = nat_integer(env, STDOUT_FILENO);
+    NatObject *nat_stdout = nat_new(env, IO, 1, &stdout_fileno, NULL, NULL);
+    nat_global_set(env, "$stdout", nat_stdout);
+    nat_const_set(env, Object, "STDOUT", nat_stdout);
+
+    NatObject *stderr_fileno = nat_integer(env, STDERR_FILENO);
+    NatObject *nat_stderr = nat_new(env, IO, 1, &stderr_fileno, NULL, NULL);
+    nat_global_set(env, "$stderr", nat_stderr);
+    nat_const_set(env, Object, "STDERR", nat_stderr);
+
+    /*OBJ_NAT_INIT*/
 
     return env;
 }
@@ -249,25 +324,29 @@ NatEnv *build_top_env() {
 /*TOP*/
 
 NatObject *EVAL(NatEnv *env) {
-    NatObject *self = nat_new(env, Object, 0, NULL, NULL, NULL);
-    self->flags = NAT_FLAG_MAIN_OBJECT;
-    nat_define_singleton_method(env, self, "inspect", main_obj_inspect);
-    obj_language_exceptions(env, self);
-    int run_exit_handlers = TRUE;
+    NatObject *self = nat_global_get(env, "$NAT_main_object");
+    (void)self; // don't warn about unused var
+    int run_exit_handlers = true;
     if (!NAT_RESCUE(env)) {
         /*BODY*/
-        run_exit_handlers = FALSE;
+        run_exit_handlers = false;
         nat_run_at_exit_handlers(env);
-        return nil; // just in case there's no return value
+        return NAT_NIL; // just in case there's no return value
     } else {
         nat_handle_top_level_exception(env, run_exit_handlers);
-        return nil;
+        return NAT_NIL;
     }
 }
 
-int main(void) {
+int main(int argc, char *argv[]) {
     setvbuf(stdout, NULL, _IOLBF, 1024);
     NatEnv *env = build_top_env();
+    NatObject *ARGV = nat_array(env);
+    nat_const_set(env, NAT_OBJECT, "ARGV", ARGV);
+    assert(argc > 0);
+    for (int i=1; i<argc; i++) {
+        nat_array_push(ARGV, nat_string(env, argv[i]));
+    }
     if (EVAL(env)) {
         return 0;
     } else {

@@ -1,1 +1,9 @@
 obj/**/*.o
+.build
+test/tmp
+coverage-report
+
+# Editor tools
+.ccls
+compile_commands.json
+tags

@@ -3,9 +3,11 @@ require 'minitest/autorun'
 require 'time'
 
 describe 'Natalie tests' do
+  parallelize_me!
+
   Dir.chdir File.expand_path('../..', __dir__)
   Dir['test/natalie/*_test.nat'].each do |path|
-    code = File.read(path)
+    code = File.read(path, encoding: 'utf-8')
     next if code =~ /# skip-test/
     describe path do
       it 'has the same output in ruby and natalie' do

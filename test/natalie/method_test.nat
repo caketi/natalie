@@ -1,4 +1,4 @@
-require 'spec'
+require_relative '../spec_helper'
 
 def foo
   'foo'
@@ -69,67 +69,110 @@ class Bar
   end
 end
 
+class YieldToBlock
+  def yield_to_block
+    yield
+  end
+end
+
+class BlockPassTest < YieldToBlock
+  def yield_to_block(&b)
+    super(&b)
+  end
+end
+
 describe 'method' do
   it 'can be called' do
-    foo.must_equal 'foo'
+    foo.should == 'foo'
   end
 
   it 'can receive arguments' do
-    double(3).must_equal 6
-    mul(1, 2, 3).must_equal 6
+    double(3).should == 6
+    mul(1, 2, 3).should == 6
   end
 
   it 'can receive and yield to a block' do
     r = block_test { 1 }
-    r.must_equal 1
+    r.should == 1
     x = 2
     r = block_test do
       x
     end
-    r.must_equal 2
+    r.should == 2
   end
 
-  it 'can receive a block as an Proc argument' do
+  it 'can receive a block as a Proc argument' do
     r = block_arg_test(1, 2) { 3 }
-    r.must_equal [1, 2, 3]
+    r.should == [1, 2, 3]
+  end
+
+  # FIXME: doesn't actually bubble up because LocalJumpError is trapped by the method
+  xit 'raises an error when trying to yield without a block' do
+    -> { YieldToBlock.new.yield_to_block }.should raise_error(LocalJumpError)
+  end
+
+  xit 'can call super with a block arg' do
+    t = BlockPassTest.new
+    it_worked = false
+    t.yield_to_block do
+      it_worked = true
+    end
+    it_worked.should == true
   end
 
   it 'can yield args to a block' do
     r = block_with_args_test { |x, y, z| [x, y, z] }
-    r.must_equal [1, 2, 3]
+    r.should == [1, 2, 3]
     r = block_with_args_test2 do |x, y, z|
       [x, y, z]
     end
-    r.must_equal [4, 5, nil]
+    r.should == [4, 5, nil]
     r = block_with_args_test2 do |x|
       [x]
     end
-    r.must_equal [4]
+    r.should == [4]
   end
 
   it 'can be an instance method' do
-    Foo.new.foo.must_equal 'instance method foo'
+    Foo.new.foo.should == 'instance method foo'
   end
 
   it 'can be a class method' do
-    Foo.foo.must_equal 'class method foo'
-    Foo.foo2.must_equal 'class method foo2'
+    Foo.foo.should == 'class method foo'
+    Foo.foo2.should == 'class method foo2'
   end
 
   it 'can define a method dynamically' do
-    Bar.new.bar.must_equal 'bar'
+    Bar.new.bar.should == 'bar'
   end
 
   it 'can have default arguments' do
-    default.must_equal 1
-    default(2).must_equal 2
-    default_after_regular(1).must_equal [1, 2]
-    default_after_regular(2).must_equal [2, 2]
-    default_after_regular(2, 3).must_equal [2, 3]
-    default_with_splat(2).must_equal [2, 2, []]
-    default_calling_another_method.must_equal 1
-    default_calling_another_method2.must_equal 2
+    default.should == 1
+    default(2).should == 2
+    default_after_regular(1).should == [1, 2]
+    default_after_regular(2).should == [2, 2]
+    default_after_regular(2, 3).should == [2, 3]
+    default_with_splat(2).should == [2, 2, []]
+    default_calling_another_method.should == 1
+    default_calling_another_method2.should == 2
+  end
+
+  describe '#respond_to?' do
+    it 'works for class methods' do
+      Foo.respond_to?('foo').should == true
+      Foo.respond_to?('foo2').should == true
+      Foo.respond_to?('xxx').should == false
+    end
+
+    it 'works for instance methods' do
+      Foo.new.respond_to?('foo').should == true
+      Foo.new.respond_to?('xxx').should == false
+      Bar.new.respond_to?('bar').should == true
+      Bar.new.respond_to?('xxx').should == false
+    end
+
+    it 'returns false for undefined methods' do
+      NilClass.respond_to?('new').should == false
+    end
   end
 end
-
-run_specs

@@ -5,6 +5,8 @@ require 'optparse'
 require 'tempfile'
 require_relative '../lib/natalie'
 
+orig_args = ARGV.dup
+
 options = { load_path: [] }
 OptionParser.new do |opts|
   opts.banner = 'Usage: natalie [options] file.nat'
@@ -15,6 +17,8 @@ OptionParser.new do |opts|
       ENV['DEBUG_PASS1'] = 'true'
     when 'p2'
       ENV['DEBUG_PASS2'] = 'true'
+    when 'p3'
+      ENV['DEBUG_PASS3'] = 'true'
     else
       ENV['DEBUG'] = 'true'
     end
@@ -41,6 +45,13 @@ OptionParser.new do |opts|
     options[:load_path].unshift(p)
   end
 end.parse!
+
+build_type_path = File.expand_path('../.build', __dir__)
+if File.exist?(build_type_path)
+  ENV['BUILD'] = File.read(build_type_path).strip
+else
+  ENV['BUILD'] = 'debug'
+end
 
 if options[:execute]
   source_path = '-e'
@@ -70,38 +81,19 @@ elsif options[:compile]
 else
   compiler = Natalie::Compiler.new(ast, source_path)
   compiler.load_path = options[:load_path]
-  out = Tempfile.create('natalie')
+  extension = if RUBY_PLATFORM =~ /msys/
+                '.exe'
+              else
+                ''
+              end
+  out = Tempfile.create("natalie#{extension}")
   out.close
   compiler.out_path = out.path
   compiler.compile
   puts out.path if ENV['DEBUG']
   status = nil
-  Open3.popen3(out.path) do |stdin, stdout, stderr, wait_thread|
-    stdin.close_write
-    Thread.new do
-      begin
-        while (line = stderr.gets)
-          $stderr.puts line
-        end
-      rescue IOError
-      end
-    end
-    Thread.new do
-      begin
-        while (line = stdout.gets)
-          puts line
-        end
-      rescue IOError
-      end
-    end
-    status = wait_thread.value.exitstatus
-    nil until stdout.eof? && stderr.eof? # give those threads some time to finish reading stdout/stderr
-    File.unlink(out.path) unless ENV['DEBUG']
-  end
-  if status.nil?
-    puts 'segfault'
-    exit 1
-  else
-    exit status
-  end
+  pid = spawn(out.path, *ARGV)
+  Process.wait(pid)
+  status = $?
+  exit status.to_i
 end
