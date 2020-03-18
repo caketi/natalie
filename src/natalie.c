@@ -1,6 +1,3 @@
-#define GC_THREADS
-#include <gc.h>
-
 #include "nat_gc.h"
 #include "natalie.h"
 #include <ctype.h>
@@ -1067,13 +1064,13 @@ NatObject *nat_thread(NatEnv *env, NatBlock *block) {
     NatObject *obj = nat_new(env, nat_const_get(env, NAT_OBJECT, "Thread"), 0, NULL, NULL, NULL);
     obj->type = NAT_VALUE_THREAD;
     obj->env = *env;
-    GC_pthread_create(&obj->thread_id, NULL, nat_create_thread, (void*)block);
+    nat_pthread_create(&obj->thread_id, NULL, nat_create_thread, (void*)block);
     return obj;
 }
 
 NatObject *nat_thread_join(NatEnv *env, NatObject *thread) {
     void *value = NULL;
-    int err = GC_pthread_join(thread->thread_id, &value);
+    int err = nat_pthread_join(thread->thread_id, &value);
     if (err == ESRCH) { // thread not found (alread joined?)
         return thread->thread_value;
     } else if (err) {

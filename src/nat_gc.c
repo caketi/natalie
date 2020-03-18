@@ -1,6 +1,3 @@
-#define GC_THREADS
-#include <gc.h>
-
 #include "nat_gc.h"
 #include "natalie.h"
 
@@ -25,20 +22,4 @@ NatObject *nat_alloc(NatEnv *env) {
         abort();
     }
     return obj;
-}
-
-void *nat_malloc_root(size_t size) {
-    return GC_MALLOC(size);
-}
-
-void *nat_malloc(NatEnv *env, size_t size) {
-    return GC_MALLOC(size);
-}
-
-void *nat_realloc_root(void *ptr, size_t size) {
-    return GC_REALLOC(ptr, size);
-}
-
-void *nat_realloc(NatEnv *env, void *ptr, size_t size) {
-    return GC_REALLOC(ptr, size);
 }
