@@ -1,9 +1,11 @@
+#define GC_THREADS
+#include <gc.h>
+
 #include "nat_gc.h"
 #include "natalie.h"
 #include <ctype.h>
 #include <stdarg.h>
 #include <math.h>
-#include <gc.h>
 
 bool nat_is_constant_name(char *name) {
     return strlen(name) > 0 && isupper(name[0]);
@@ -62,7 +64,7 @@ NatObject *nat_var_get(NatEnv *env, char *key, size_t index) {
 NatObject *nat_var_set(NatEnv *env, char *key, size_t index, NatObject *val) {
     size_t needed = index + 1;
     if (env->var_count == 0) {
-        env->vars = nat_calloc(env, needed, sizeof(NatObject*));
+        env->vars = nat_malloc(env, needed * sizeof(NatObject*));
         env->var_count = needed;
     } else if (needed > env->var_count) {
         env->vars = nat_realloc(env, env->vars, sizeof(NatObject*) * needed);
@@ -73,12 +75,12 @@ NatObject *nat_var_set(NatEnv *env, char *key, size_t index, NatObject *val) {
 }
 
 NatGlobalEnv *nat_build_global_env() {
-    NatGlobalEnv *global_env = GC_MALLOC(sizeof(NatGlobalEnv));
-    struct hashmap *global_table = GC_MALLOC(sizeof(struct hashmap));
+    NatGlobalEnv *global_env = nat_malloc_root(sizeof(NatGlobalEnv));
+    struct hashmap *global_table = nat_malloc_root(sizeof(struct hashmap));
     hashmap_init(global_table, hashmap_hash_string, hashmap_compare_string, 100);
     hashmap_set_key_alloc_funcs(global_table, hashmap_alloc_key_string, NULL);
     global_env->globals = global_table;
-    struct hashmap *symbol_table = GC_MALLOC(sizeof(struct hashmap));
+    struct hashmap *symbol_table = nat_malloc_root(sizeof(struct hashmap));
     hashmap_init(symbol_table, hashmap_hash_string, hashmap_compare_string, 100);
     hashmap_set_key_alloc_funcs(symbol_table, hashmap_alloc_key_string, NULL);
     global_env->symbols = symbol_table;
@@ -423,7 +425,7 @@ NatObject *nat_exception(NatEnv *env, NatObject *klass, char *message) {
 NatObject *nat_array(NatEnv *env) {
     NatObject *obj = nat_new(env, nat_const_get(env, NAT_OBJECT, "Array"), 0, NULL, NULL, NULL);
     obj->type = NAT_VALUE_ARRAY;
-    obj->ary = nat_calloc(env, NAT_ARRAY_INIT_SIZE, sizeof(NatObject*));
+    obj->ary = nat_malloc(env, NAT_ARRAY_INIT_SIZE * sizeof(NatObject*));
     obj->ary_len = 0;
     obj->ary_cap = NAT_ARRAY_INIT_SIZE;
     return obj;
@@ -433,7 +435,7 @@ NatObject *nat_array_copy(NatEnv *env, NatObject *source) {
     assert(NAT_TYPE(source) == NAT_VALUE_ARRAY);
     NatObject *obj = nat_new(env, nat_const_get(env, NAT_OBJECT, "Array"), 0, NULL, NULL, NULL);
     obj->type = NAT_VALUE_ARRAY;
-    obj->ary = nat_calloc(env, source->ary_len, sizeof(NatObject*));
+    obj->ary = nat_malloc(env, source->ary_len * sizeof(NatObject*));
     memcpy(obj->ary, source->ary, source->ary_len * sizeof(NatObject*));
     obj->ary_len = source->ary_len;
     obj->ary_cap = source->ary_len;
@@ -1065,13 +1067,13 @@ NatObject *nat_thread(NatEnv *env, NatBlock *block) {
     NatObject *obj = nat_new(env, nat_const_get(env, NAT_OBJECT, "Thread"), 0, NULL, NULL, NULL);
     obj->type = NAT_VALUE_THREAD;
     obj->env = *env;
-    pthread_create(&obj->thread_id, NULL, nat_create_thread, (void*)block);
+    GC_pthread_create(&obj->thread_id, NULL, nat_create_thread, (void*)block);
     return obj;
 }
 
 NatObject *nat_thread_join(NatEnv *env, NatObject *thread) {
     void *value = NULL;
-    int err = pthread_join(thread->thread_id, &value);
+    int err = GC_pthread_join(thread->thread_id, &value);
     if (err == ESRCH) { // thread not found (alread joined?)
         return thread->thread_value;
     } else if (err) {

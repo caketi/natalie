@@ -1,5 +1,4 @@
 #include <setjmp.h>
-#include <gc.h>
 
 #include "nat_gc.h"
 #include "natalie.h"
@@ -10,7 +9,7 @@
 /*OBJ_NAT*/
 
 NatEnv *build_top_env() {
-    NatEnv *env = GC_MALLOC(sizeof(NatEnv));
+    NatEnv *env = nat_malloc_root(sizeof(NatEnv));
     nat_build_env(env, NULL);
     env->method_name = heap_string(env, "<main>");
 
@@ -341,6 +340,7 @@ NatObject *EVAL(NatEnv *env) {
 }
 
 int main(int argc, char *argv[]) {
+    nat_gc_init();
     setvbuf(stdout, NULL, _IOLBF, 1024);
     NatEnv *env = build_top_env();
     NatObject *ARGV = nat_array(env);

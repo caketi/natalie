@@ -9,10 +9,10 @@ BDWGC := ext/bdwgc/include
 # debug, coverage, or release
 BUILD := debug
 
-cflags.debug := -g -Wall -Wextra -Werror -Wno-unused-parameter -pthread
-cflags.coverage := ${cflags.debug} -fprofile-arcs -ftest-coverage -pthread
-cflags.release := -O3 -pthread
-CFLAGS := ${cflags.${BUILD}}
+cflags.debug := -g -Wall -Wextra -Werror -Wno-unused-parameter
+cflags.coverage := ${cflags.debug} -fprofile-arcs -ftest-coverage
+cflags.release := -O3
+CFLAGS := ${cflags.${BUILD}} -pthread
 
 HAS_TTY := $(shell test -t 1 && echo yes || echo no)
 ifeq ($(HAS_TTY),yes)
@@ -43,14 +43,18 @@ ext/onigmo/.libs/libonigmo.a:
 	cd ext/onigmo && ./autogen.sh && ./configure --with-pic && make
 
 ext/bdwgc/.libs/libgc.la:
-	cd ext/bdwgc && ./autogen.sh && ./configure && make
+	cd ext/bdwgc && ./autogen.sh && ./configure --enable-threads=posix --enable-thread-local-alloc --enable-parallel-mark && make
 
 clean_nat:
 	rm -f $(OBJ)/*.o $(OBJ)/nat/*.o
 
-clean: clean_nat
+clean_onigmo:
 	cd ext/onigmo && make clean || true
+
+clean_bdwgc:
 	cd ext/bdwgc && make clean || true
+
+clean: clean_nat clean_onigmo clean_bdwgc
 
 test: build
 	ruby test/all.rb
