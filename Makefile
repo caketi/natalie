@@ -4,6 +4,7 @@ SRC := src
 LIB := lib/natalie
 OBJ := obj
 ONIGMO := ext/onigmo
+BDWGC := ext/bdwgc/include
 
 # debug, coverage, or release
 BUILD := debug
@@ -27,13 +28,13 @@ NAT_OBJECTS := $(patsubst $(SRC)/%.nat, $(OBJ)/nat/%.o, $(NAT_SOURCES))
 mkfile_path := $(abspath $(lastword $(MAKEFILE_LIST)))
 current_dir := $(notdir $(patsubst %/,%,$(dir $(mkfile_path))))
 
-build: write_build_type ext/onigmo/.libs/libonigmo.a $(OBJECTS) $(NAT_OBJECTS)
+build: write_build_type ext/onigmo/.libs/libonigmo.a ext/bdwgc/.libs/libgc.la $(OBJECTS) $(NAT_OBJECTS)
 
 write_build_type:
 	@echo $(BUILD) > .build
 
 $(OBJ)/%.o: $(SRC)/%.c
-	$(CC) $(CFLAGS) -I$(SRC) -I$(ONIGMO) -fPIC -c $< -o $@
+	$(CC) $(CFLAGS) -I$(SRC) -I$(ONIGMO) -I$(BDWGC) -fPIC -c $< -o $@
 
 $(OBJ)/nat/%.o: $(SRC)/%.nat
 	bin/natalie --compile-obj $@ $<
@@ -41,11 +42,15 @@ $(OBJ)/nat/%.o: $(SRC)/%.nat
 ext/onigmo/.libs/libonigmo.a:
 	cd ext/onigmo && ./autogen.sh && ./configure --with-pic && make
 
+ext/bdwgc/.libs/libgc.la:
+	cd ext/bdwgc && ./autogen.sh && ./configure && make
+
 clean_nat:
 	rm -f $(OBJ)/*.o $(OBJ)/nat/*.o
 
 clean: clean_nat
 	cd ext/onigmo && make clean || true
+	cd ext/bdwgc && make clean || true
 
 test: build
 	ruby test/all.rb

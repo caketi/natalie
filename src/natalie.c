@@ -1,8 +1,9 @@
-#include "gc.h"
+#include "nat_gc.h"
 #include "natalie.h"
 #include <ctype.h>
 #include <stdarg.h>
 #include <math.h>
+#include <gc.h>
 
 bool nat_is_constant_name(char *name) {
     return strlen(name) > 0 && isupper(name[0]);
@@ -72,12 +73,12 @@ NatObject *nat_var_set(NatEnv *env, char *key, size_t index, NatObject *val) {
 }
 
 NatGlobalEnv *nat_build_global_env() {
-    NatGlobalEnv *global_env = malloc(sizeof(NatGlobalEnv));
-    struct hashmap *global_table = malloc(sizeof(struct hashmap));
+    NatGlobalEnv *global_env = GC_MALLOC(sizeof(NatGlobalEnv));
+    struct hashmap *global_table = GC_MALLOC(sizeof(struct hashmap));
     hashmap_init(global_table, hashmap_hash_string, hashmap_compare_string, 100);
     hashmap_set_key_alloc_funcs(global_table, hashmap_alloc_key_string, NULL);
     global_env->globals = global_table;
-    struct hashmap *symbol_table = malloc(sizeof(struct hashmap));
+    struct hashmap *symbol_table = GC_MALLOC(sizeof(struct hashmap));
     hashmap_init(symbol_table, hashmap_hash_string, hashmap_compare_string, 100);
     hashmap_set_key_alloc_funcs(symbol_table, hashmap_alloc_key_string, NULL);
     global_env->symbols = symbol_table;

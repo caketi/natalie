@@ -1,4 +1,6 @@
-#include "gc.h"
+#include <gc.h>
+
+#include "nat_gc.h"
 #include "natalie.h"
 
 NatObject *nat_alloc(NatEnv *env) {
@@ -21,13 +23,13 @@ NatObject *nat_alloc(NatEnv *env) {
 }
 
 void *nat_malloc(NatEnv *env, size_t size) {
-    return malloc(size);
+    return GC_MALLOC(size);
 }
 
 void *nat_calloc(NatEnv *env, size_t count, size_t size) {
-    return calloc(count, size);
+    return GC_MALLOC(count * size);
 }
 
 void *nat_realloc(NatEnv *env, void *ptr, size_t size) {
-    return realloc(ptr, size);
+    return GC_REALLOC(ptr, size);
 }

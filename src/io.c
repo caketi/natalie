@@ -1,7 +1,7 @@
 #include <unistd.h>
 #include <errno.h>
 
-#include "gc.h"
+#include "nat_gc.h"
 #include "natalie.h"
 #include "builtin.h"
 

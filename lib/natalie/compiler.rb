@@ -12,6 +12,8 @@ module Natalie
     OBJ_PATH = File.expand_path('../../obj', __dir__)
     ONIGMO_SRC_PATH = File.expand_path('../../ext/onigmo', __dir__)
     ONIGMO_LIB_PATH = File.expand_path('../../ext/onigmo/.libs', __dir__)
+    BDWGC_SRC_PATH = File.expand_path('../../ext/bdwgc/include', __dir__)
+    BDWGC_LIB_PATH = File.expand_path('../../ext/bdwgc/.libs', __dir__)
 
     MAIN_TEMPLATE = File.read(File.join(SRC_PATH, 'main.c'))
     OBJ_TEMPLATE = <<-EOF
@@ -113,21 +115,13 @@ module Natalie
       Array(@load_path)
     end
 
-    def ld_library_path
-      self.class.ld_library_path
-    end
-
-    def self.ld_library_path
-      ONIGMO_LIB_PATH
-    end
-
     private
 
     def compiler_command
       if compile_to_object_file
         "#{cc} #{build_flags} -I #{SRC_PATH} -I #{ONIGMO_SRC_PATH} -fPIC -x c -c #{@c_path} -o #{out_path} 2>&1"
       else
-        "#{cc} #{build_flags} #{shared? ? '-fPIC -shared' : ''} -I #{SRC_PATH} -I #{ONIGMO_SRC_PATH} -o #{out_path} -L #{ld_library_path} #{OBJ_PATH}/*.o #{OBJ_PATH}/nat/*.o #{ONIGMO_LIB_PATH}/libonigmo.a -x c #{@c_path} 2>&1"
+        "#{cc} #{build_flags} #{shared? ? '-fPIC -shared' : ''} -I #{SRC_PATH} -I #{ONIGMO_SRC_PATH} -I #{BDWGC_SRC_PATH} -o #{out_path} #{OBJ_PATH}/*.o #{OBJ_PATH}/nat/*.o #{ONIGMO_LIB_PATH}/libonigmo.a #{BDWGC_LIB_PATH}/libgc.dylib -x c #{@c_path} 2>&1"
       end
     end
 
