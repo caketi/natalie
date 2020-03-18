@@ -1,9 +1,30 @@
-#include "nat_gc.h"
 #include "natalie.h"
 #include <ctype.h>
 #include <stdarg.h>
 #include <math.h>
 
+void nat_gc_init() {
+    GC_INIT();
+}
+
+NatObject *nat_alloc_object(NatEnv *env) {
+    NatObject *obj = nat_malloc(env, sizeof(NatObject));
+    obj->flags = 0;
+    obj->type = NAT_VALUE_OTHER;
+    obj->included_modules_count = 0;
+    obj->included_modules = NULL;
+    obj->klass = NULL;
+    obj->singleton_class = NULL;
+    obj->constants.table = NULL;
+    obj->ivars.table = NULL;
+    obj->env.outer = NULL;
+    int err = pthread_mutex_init(&obj->mutex, NULL);
+    if (err) {
+        fprintf(stderr, "Could not initialize mutex: %d\n", err);
+        abort();
+    }
+    return obj;
+}
 bool nat_is_constant_name(char *name) {
     return strlen(name) > 0 && isupper(name[0]);
 }
@@ -321,7 +342,7 @@ char *heap_string(NatEnv *env, char *str) {
 }
 
 NatObject *nat_subclass(NatEnv *env, NatObject *superclass, char *name) {
-    NatObject *klass = nat_alloc(env);
+    NatObject *klass = nat_alloc_object(env);
     klass->type = NAT_VALUE_CLASS;
     klass->klass = superclass->klass;
     if (superclass->singleton_class) {
@@ -339,7 +360,7 @@ NatObject *nat_subclass(NatEnv *env, NatObject *superclass, char *name) {
 }
 
 NatObject *nat_module(NatEnv *env, char *name) {
-    NatObject *val = nat_alloc(env);
+    NatObject *val = nat_alloc_object(env);
     val->type = NAT_VALUE_MODULE;
     val->klass = nat_const_get(env, NAT_OBJECT, "Module");
     val->class_name = name ? heap_string(env, name) : NULL;
@@ -360,7 +381,7 @@ void nat_class_include(NatEnv *env, NatObject *klass, NatObject *module) {
 }
 
 NatObject *nat_new(NatEnv *env, NatObject *klass, size_t argc, NatObject **args, struct hashmap *kwargs, NatBlock *block) {
-    NatObject *obj = nat_alloc(env);
+    NatObject *obj = nat_alloc_object(env);
     obj->klass = klass;
     while (1) {
         NatObject *matching_class_or_module;

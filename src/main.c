@@ -1,6 +1,5 @@
 #include <setjmp.h>
 
-#include "nat_gc.h"
 #include "natalie.h"
 #include "builtin.h"
 
@@ -13,7 +12,7 @@ NatEnv *build_top_env() {
     nat_build_env(env, NULL);
     env->method_name = heap_string(env, "<main>");
 
-    NatObject *Class = nat_alloc(env);
+    NatObject *Class = nat_alloc_object(env);
     Class->type = NAT_VALUE_CLASS;
     Class->class_name = heap_string(env, "Class");
     Class->klass = Class;
@@ -24,7 +23,7 @@ NatEnv *build_top_env() {
     hashmap_set_key_alloc_funcs(&Class->constants, hashmap_alloc_key_string, NULL);
     nat_define_method(env, Class, "superclass", Class_superclass);
 
-    NatObject *BasicObject = nat_alloc(env);
+    NatObject *BasicObject = nat_alloc_object(env);
     BasicObject->type = NAT_VALUE_CLASS;
     BasicObject->class_name = heap_string(env, "BasicObject");
     BasicObject->klass = Class;

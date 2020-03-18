@@ -12,8 +12,7 @@
 #include <ctype.h>
 #include <errno.h>
 
-#include "nat_gc.h"
-
+#include "natalie.h"
 #include "hashmap.h"
 
 #ifndef HASHMAP_NOASSERT

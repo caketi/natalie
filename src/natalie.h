@@ -12,6 +12,9 @@
 #include <string.h>
 #include <unistd.h>
 
+#define GC_THREADS
+#include <gc.h>
+
 #include "onigmo.h"
 #include "hashmap.h"
 
@@ -185,6 +188,14 @@ enum NatValueType {
     _result; \
 })
 
+#define nat_malloc_root(size) GC_MALLOC(size)
+#define nat_malloc(env, size) GC_MALLOC(size)
+#define nat_realloc_root(ptr, size) GC_REALLOC(ptr, size)
+#define nat_realloc(env, ptr, size) GC_REALLOC(ptr, size)
+
+#define nat_pthread_create(thread, attr, fn, arg) GC_pthread_create(thread, attr, fn, arg)
+#define nat_pthread_join(thread, value_ptr) GC_pthread_join(thread, value_ptr)
+
 struct NatObject {
     enum NatValueType type;
     NatObject *klass;
@@ -276,6 +287,9 @@ struct NatObject {
         char *symbol;
     };
 };
+
+void nat_gc_init();
+NatObject *nat_alloc_object(NatEnv *env);
 
 bool nat_is_constant_name(char *name);
 bool nat_is_special_name(char *name);
