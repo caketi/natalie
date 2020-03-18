@@ -55,6 +55,7 @@ The compiler and REPL currently (but hopefully not for long!) require Ruby.
 I've only tested on Ruby 2.6.x.
 
 ```sh
+brew install boehmgc
 git submodule update --init
 gem install bundler
 bundle install
