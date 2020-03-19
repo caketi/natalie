@@ -3,9 +3,19 @@
 #include <stdarg.h>
 #include <math.h>
 
+#ifndef NAT_WITHOUT_GC
 void nat_gc_init() {
     GC_INIT();
 }
+
+void *nat_calloc_root(size_t count, size_t size) {
+    void *ptr = GC_MALLOC(count * size);
+    memset(ptr, 0, count * size);
+    return ptr;
+}
+#else
+void nat_gc_init() {}
+#endif
 
 NatObject *nat_alloc_object(NatEnv *env) {
     NatObject *obj = nat_malloc(env, sizeof(NatObject));

@@ -188,13 +188,23 @@ enum NatValueType {
     _result; \
 })
 
-#define nat_malloc_root(size) GC_MALLOC(size)
-#define nat_malloc(env, size) GC_MALLOC(size)
-#define nat_realloc_root(ptr, size) GC_REALLOC(ptr, size)
-#define nat_realloc(env, ptr, size) GC_REALLOC(ptr, size)
-
-#define nat_pthread_create(thread, attr, fn, arg) GC_pthread_create(thread, attr, fn, arg)
-#define nat_pthread_join(thread, value_ptr) GC_pthread_join(thread, value_ptr)
+#ifndef NAT_WITHOUT_GC
+# define nat_malloc_root(size) GC_MALLOC(size)
+# define nat_malloc(env, size) GC_MALLOC(size)
+void *nat_calloc_root(size_t count, size_t size);
+# define nat_realloc_root(ptr, size) GC_REALLOC(ptr, size)
+# define nat_realloc(env, ptr, size) GC_REALLOC(ptr, size)
+# define nat_pthread_create(thread, attr, fn, arg) GC_pthread_create(thread, attr, fn, arg)
+# define nat_pthread_join(thread, value_ptr) GC_pthread_join(thread, value_ptr)
+#else
+# define nat_malloc_root(size) malloc(size)
+# define nat_malloc(env, size) malloc(size)
+# define nat_calloc_root(count, size) calloc(count, size)
+# define nat_realloc_root(ptr, size) realloc(ptr, size)
+# define nat_realloc(env, ptr, size) realloc(ptr, size)
+# define nat_pthread_create(thread, attr, fn, arg) pthread_create(thread, attr, fn, arg)
+# define nat_pthread_join(thread, value_ptr) pthread_join(thread, value_ptr)
+#endif
 
 struct NatObject {
     enum NatValueType type;

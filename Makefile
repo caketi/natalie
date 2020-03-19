@@ -14,6 +14,10 @@ cflags.coverage := ${cflags.debug} -fprofile-arcs -ftest-coverage
 cflags.release := -O3
 CFLAGS := ${cflags.${BUILD}} -pthread
 
+ifdef NAT_WITHOUT_GC
+  CFLAGS += -DNAT_WITHOUT_GC
+endif
+
 HAS_TTY := $(shell test -t 1 && echo yes || echo no)
 ifeq ($(HAS_TTY),yes)
   DOCKER_FLAGS := -i -t
@@ -43,7 +47,9 @@ ext/onigmo/.libs/libonigmo.a:
 	cd ext/onigmo && ./autogen.sh && ./configure --with-pic && make
 
 ext/bdwgc/.libs/libgc.la:
-	cd ext/bdwgc && ./autogen.sh && ./configure --enable-threads=posix --enable-thread-local-alloc --enable-parallel-mark && make
+	cd ext/bdwgc && ./autogen.sh && ./configure --enable-static --with-pic --enable-threads=posix --enable-thread-local-alloc --enable-parallel-mark && make
+
+clean: clean_nat clean_onigmo clean_bdwgc
 
 clean_nat:
 	rm -f $(OBJ)/*.o $(OBJ)/nat/*.o
@@ -54,14 +60,12 @@ clean_onigmo:
 clean_bdwgc:
 	cd ext/bdwgc && make clean || true
 
-clean: clean_nat clean_onigmo clean_bdwgc
-
 test: build
 	ruby test/all.rb
 
 test_valgrind: build
 	bin/natalie -c assign_test test/natalie/assign_test.nat
-	valgrind --leak-check=no --error-exitcode=1 ./assign_test
+	valgrind --leak-check=no --track-origins=yes --error-exitcode=1 ./assign_test
 
 coverage_report:
 	lcov -c --directory . --output-file coverage.info
@@ -77,7 +81,7 @@ docker_test_clang: docker_build
 	docker run $(DOCKER_FLAGS) -e "CC=/usr/bin/clang" --rm --entrypoint make natalie clean test
 
 docker_test_valgrind: docker_build
-	docker run $(DOCKER_FLAGS) --rm --entrypoint make natalie test_valgrind
+	docker run $(DOCKER_FLAGS) --rm --entrypoint make -e NAT_WITHOUT_GC=true natalie clean_nat test_valgrind
 
 docker_coverage_report: docker_build
 	rm -rf coverage-report

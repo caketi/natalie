@@ -119,9 +119,9 @@ module Natalie
 
     def compiler_command
       if compile_to_object_file
-        "#{cc} #{build_flags} -I #{SRC_PATH} -I #{ONIGMO_SRC_PATH} -fPIC -x c -c #{@c_path} -o #{out_path} 2>&1"
+        "#{cc} #{build_flags} #{optional_build_flags} -I #{SRC_PATH} -I #{ONIGMO_SRC_PATH} -I #{BDWGC_SRC_PATH} -fPIC -x c -c #{@c_path} -o #{out_path} 2>&1"
       else
-        "#{cc} #{build_flags} #{shared? ? '-fPIC -shared' : ''} -I #{SRC_PATH} -I #{ONIGMO_SRC_PATH} -I #{BDWGC_SRC_PATH} -o #{out_path} #{OBJ_PATH}/*.o #{OBJ_PATH}/nat/*.o #{ONIGMO_LIB_PATH}/libonigmo.a #{BDWGC_LIB_PATH}/libgc.dylib -x c #{@c_path} 2>&1"
+        "#{cc} #{build_flags} #{optional_build_flags} #{shared? ? '-fPIC -shared' : ''} -I #{SRC_PATH} -I #{ONIGMO_SRC_PATH} -I #{BDWGC_SRC_PATH} -o #{out_path} #{OBJ_PATH}/*.o #{OBJ_PATH}/nat/*.o #{ONIGMO_LIB_PATH}/libonigmo.a #{BDWGC_LIB_PATH}/libgc.a -x c #{@c_path} 2>&1"
       end
     end
 
@@ -147,6 +147,12 @@ module Natalie
         DEBUG_FLAGS + ' ' + COVERAGE_FLAGS
       else
         raise "unknown build mode: #{ENV['BUILD'].inspect}"
+      end
+    end
+
+    def optional_build_flags
+      if ENV['NAT_WITHOUT_GC']
+        '-DNAT_WITHOUT_GC'
       end
     end
 
